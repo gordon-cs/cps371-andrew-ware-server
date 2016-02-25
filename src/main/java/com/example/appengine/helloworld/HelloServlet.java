@@ -38,30 +38,53 @@ public class HelloServlet extends HttpServlet {
     @Override
     public void doGet(HttpServletRequest req, HttpServletResponse resp)
     throws IOException {
-        resp.setHeader("content-type", "application/json; charset=utf-8");
+        resp.setHeader("content-type", "application/json; charset=utf-8");    
         PrintWriter out = resp.getWriter();
 
         // parse the query string
         Map < String, String > queryParams = new HashMap < String, String > ();
         String[] queryParamsArr = req.getQueryString().split("[&]");
         for (int i = 0; i < queryParamsArr.length; i++) {
+
             String[] queryItem = queryParamsArr[i].split("[=]");
             queryParams.put(queryItem[0], queryItem[1]);
+
         }
 
         if (queryParams.get("lat") != null && queryParams.get("lon") != null) {
-            
-            /* check if in cache first
-            if (in cache) {
-                // out.println(cachedObject);
+
+            float lat = Float.parseFloat(queryParams.get("lat"));
+            float lon = Float.parseFloat(queryParams.get("lon"));
+
+            //check if in cache first
+            // round lat and lon down to the thousands place to compare to other keys
+            String roundedLat = Double.toString(Math.floor(lat * 1000) / 1000);
+            String roundedLon = Double.toString(Math.floor(lon * 1000) / 1000);
+            String key = roundedLat + "," + roundedLon;
+
+            CachedObject cachedObj = (CachedObject) CacheManager.getCache(key);
+
+            if (cachedObj != null) {
+
+                // return found cache object
+                out.println(cachedObj.getObject());
+
             } else {
-                // add it to the cache
-                // out.println(this.createJSONResponse(this.getWeather(queryParams.get("lat"), queryParams.get("lon"))));
-            } 
-            */
-            out.println(this.createJSONResponse(this.getWeather(queryParams.get("lat"), queryParams.get("lon"))));
+
+                // first return the response object
+                JSONObject response = this.createJSONResponse(this.getWeather(queryParams.get("lat"), queryParams.get("lon")));
+                out.println(response);
+
+                // then add it to the cache with 60 minute lifetime
+                CachedObject newCachedObj = new CachedObject(response.toString(), key, 60);
+                CacheManager.putCache(newCachedObj);
+
+            }
+
         } else {
+
             out.println("{ 'error': 'lat and lon coords not supplied or invalid.' }");
+
         }
 
     }
